@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0A2433">
+<title>Swim Tow</title>
+<style>
+:root {
+  --deck: #EEF1F0;          /* pool-deck concrete: the page */
+  --tile: #FFFFFF;          /* wall tile: list items, notices */
+  --ink: #0A2433;           /* deep pool navy: text and buttons */
+  --wall: #566B78;          /* secondary text */
+  --rule: #D3DBDE;          /* hairlines */
+  --hand: #E2362B;          /* pace-clock second-hand red: receiving, markers, delete */
+  --lane-green: #1F9D55;    /* lane-rope colours, used for the three modes */
+  --lane-blue: #1F6FD0;
+  --lane-yellow: #E7B416;
+  --clock: #0A2433;         /* clock face */
+  --clock-ink: #F4F7F8;
+  --clock-dim: #9DB3BF;
+  --focus: #1F6FD0;
+  --num: "DIN Alternate", "Bahnschrift", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --deck: #06141C; --tile: #0D2230; --ink: #E9F1F5; --wall: #9DB3BF; --rule: #1E3747;
+    --clock: #020B10; --clock-dim: #8AA3B0; --focus: #6AA8F0;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--deck); color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+button { font: inherit; color: inherit; }
+h1 { margin: 0; font-size: 1.3rem; font-weight: 700; }
+h2 { margin: 0 0 8px; font-size: 1.05rem; font-weight: 700; }
+
+.app { max-width: 1100px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px calc(56px + env(safe-area-inset-bottom)); }
+.top { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.conn { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.btn {
+  min-height: 44px; padding: 0 18px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--ink); background: transparent; font-weight: 600;
+}
+.btn.primary { background: var(--ink); color: var(--deck); }
+.btn.danger { border-color: var(--hand); color: var(--hand); }
+.btn.small { min-height: 38px; padding: 0 14px; font-size: .92rem; }
+.btn:focus-visible, .run-item:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+.status { display: flex; gap: 10px; align-items: center; margin: 12px 0 20px; color: var(--wall); }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--wall); flex: none; }
+.dot.on { background: var(--lane-green); }
+.dot.busy { background: var(--lane-yellow); }
+.dot.recv { background: var(--hand); animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .dot.recv { animation: none; } }
+
+.support { background: var(--tile); border: 1.5px solid var(--lane-yellow); border-radius: 12px; padding: 14px 16px; margin: 0 0 20px; }
+.support p { margin: 0 0 10px; max-width: 62ch; }
+.support p:last-of-type { margin-bottom: 12px; }
+.support .row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.layout { display: grid; gap: 28px; grid-template-areas: "detail" "runs"; }
+.detail { grid-area: detail; min-width: 0; }
+.runs { grid-area: runs; min-width: 0; }
+@media (min-width: 900px) {
+  .layout { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: "runs detail"; align-items: start; }
+  .runs { position: sticky; top: 16px; }
+}
+
+.chip { display: inline-flex; align-items: center; gap: 7px; font-size: .9rem; font-weight: 600; }
+.chip i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; background: var(--wall); }
+.chip.m1 i { background: var(--lane-green); }
+.chip.m2 i { background: var(--lane-blue); }
+.chip.m3 i { background: var(--lane-yellow); }
+
+.clock { background: var(--clock); color: var(--clock-ink); border-radius: 22px; padding: 20px 20px 22px; }
+.clock-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; color: var(--clock-dim); font-size: .95rem; }
+.clock-meta .chip { color: var(--clock-ink); }
+.clock-time {
+  font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 700;
+  font-size: clamp(64px, 23vw, 148px); line-height: 1.05; margin: 10px 0 14px;
+  white-space: nowrap; overflow: hidden;
+}
+.clock-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0; }
+.clock-stats dt { color: var(--clock-dim); font-size: .88rem; }
+.clock-stats dd { margin: 2px 0 0; font: 700 clamp(22px, 6.4vw, 34px)/1.1 var(--num); font-variant-numeric: tabular-nums; }
+.clock-stats dd small { font-size: .55em; font-weight: 600; color: var(--clock-dim); margin-left: 3px; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 4px 20px; margin: 16px 0 0; }
+.facts div { padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.facts dt { color: var(--wall); font-size: .88rem; }
+.facts dd { margin: 0; font: 600 1.25rem/1.2 var(--num); font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+.panel { margin-top: 28px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--rule); }
+th:first-child, td:first-child { text-align: left; padding-left: 0; }
+th:last-child, td:last-child { padding-right: 0; }
+th { font-weight: 600; font-size: .9rem; color: var(--wall); }
+td { font-family: var(--num); font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+tr.finish td { font-weight: 700; border-bottom: 0; }
+.note { color: var(--wall); margin: 6px 0 0; max-width: 62ch; }
+
+.chart-block + .chart-block { margin-top: 14px; }
+.chart-block h3 { margin: 0 0 4px; font-size: .92rem; color: var(--wall); font-weight: 600; }
+svg.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--rule); stroke-width: 1; }
+.chart .axis { stroke: var(--wall); stroke-width: 1.2; }
+.chart .lbl { fill: var(--wall); font: 13px system-ui, sans-serif; }
+.chart .line { fill: none; stroke: var(--ink); stroke-width: 2.6; stroke-linejoin: round; stroke-linecap: round; }
+.chart .flag { fill: var(--hand); }
+
+.runs ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.run-item { width: 100%; text-align: left; background: var(--tile); border: 1.5px solid var(--rule); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+.run-item[aria-current="true"] { border-color: var(--ink); }
+.run-name { font-weight: 700; overflow-wrap: anywhere; }
+.run-line { display: flex; gap: 14px; align-items: baseline; margin-top: 2px; }
+.run-line .t { font: 700 1.35rem/1.1 var(--num); font-variant-numeric: tabular-nums; }
+.run-line .d { font-family: var(--num); font-size: 1.05rem; color: var(--wall); }
+.run-foot { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-top: 6px; color: var(--wall); font-size: .86rem; }
+.run-foot .chip { color: var(--ink); font-size: .86rem; }
+.runs-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.empty { background: var(--tile); border: 1.5px dashed var(--rule); border-radius: 14px; padding: 22px 18px; }
+.empty p { margin: 0 0 8px; max-width: 54ch; }
+.empty p:last-child { margin-bottom: 0; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: var(--ink); color: var(--deck); padding: 12px 18px; border-radius: 12px; max-width: min(92vw, 520px);
+  font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>Swim Tow</h1>
+    <div class="conn">
+      <button id="lastBtn" class="btn" type="button" hidden>Get last run</button>
+      <button id="connectBtn" class="btn primary" type="button">Connect</button>
+    </div>
+  </header>
+  <p class="status" id="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span id="statusText"></span></p>
+
+  <section id="support" class="support" hidden aria-labelledby="supportTitle">
+    <h2 id="supportTitle">Open this page in a browser with Bluetooth</h2>
+    <div id="supportBody"></div>
+  </section>
+
+  <div class="layout">
+    <main id="detail" class="detail"></main>
+    <aside id="runs" class="runs" aria-labelledby="runsTitle">
+      <h2 id="runsTitle">Saved runs</h2>
+      <ul id="runList"></ul>
+      <div class="runs-tools" id="runsTools">
+        <button id="exportJson" class="btn small" type="button">Export JSON</button>
+        <button id="exportCsv" class="btn small" type="button">Export CSV</button>
+        <button id="clearAll" class="btn small danger" type="button">Delete all</button>
+      </div>
+    </aside>
+  </div>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script id="core">
+/* Pure logic: no page access, so it can be tested on its own. */
+(function (root) {
+  "use strict";
+  var END = "<<END>>";
+  var MODES = { 1: "Assistance", 2: "Analytics", 3: "Resistance" };
+
+  function isNum(v) { return typeof v === "number" && isFinite(v); }
+
+  /* Collects the chunks the device sends and hands back one complete JSON string at the end marker. */
+  function createReceiver() {
+    var buf = "";
+    return {
+      push: function (text) {
+        // The first chunk of every run starts with {"runId". If an earlier transfer was cut off, start clean.
+        if (buf.length && /^\{"runId"/.test(text)) buf = "";
+        buf += text;
+        var i = buf.indexOf(END);
+        if (i === -1) return null;
+        var json = buf.slice(0, i);
+        buf = buf.slice(i + END.length);
+        return json;
+      },
+      reset: function () { buf = ""; },
+      pending: function () { return buf.length > 0; }
+    };
+  }
+
+  function validateRun(o) {
+    if (!o || typeof o !== "object") return { error: "The run data arrived damaged." };
+    var need = ["totalTimeS", "totalDistanceM", "avgSpeed", "topSpeed"];
+    for (var i = 0; i < need.length; i++) {
+      if (!isNum(o[need[i]])) return { error: "The run data arrived incomplete." };
+    }
+    var cps = [];
+    if (Array.isArray(o.checkpoints)) {
+      o.checkpoints.forEach(function (c) {
+        if (Array.isArray(c) && c.length >= 3 && isNum(c[0]) && isNum(c[1]) && isNum(c[2])) cps.push([c[0], c[1], c[2]]);
+      });
+    }
+    var run = {
+      runId: isNum(o.runId) ? o.runId : null,
+      mode: (o.mode === 1 || o.mode === 2 || o.mode === 3) ? o.mode : 0,
+      totalTimeS: o.totalTimeS, totalDistanceM: o.totalDistanceM,
+      avgSpeed: o.avgSpeed, topSpeed: o.topSpeed,
+      avgPowerW: isNum(o.avgPowerW) ? o.avgPowerW : 0,
+      peakPowerW: isNum(o.peakPowerW) ? o.peakPowerW : 0,
+      checkpoints: cps
+    };
+    // Optional Mode 3 fields (shown when the device sends them)
+    if (isNum(o.resistanceLb)) run.resistanceLb = o.resistanceLb;
+    if (isNum(o.outM)) run.outM = o.outM;
+    if (isNum(o.inM)) run.inM = o.inM;
+    if (typeof o.pullLimitHit === "boolean") run.pullLimitHit = o.pullLimitHit;
+    return { run: run };
+  }
+
+  function parseRun(text) {
+    var obj;
+    try { obj = JSON.parse(text); } catch (e) { return { error: "The run data arrived damaged." }; }
+    return validateRun(obj);
+  }
+
+  /* m:ss.hh, like a pace clock */
+  function fmtClock(sec) {
+    if (!isNum(sec) || sec < 0) sec = 0;
+    var cs = Math.round(sec * 100);
+    var m = Math.floor(cs / 6000);
+    var s = (cs % 6000) / 100;
+    return m + ":" + (s < 10 ? "0" : "") + s.toFixed(2);
+  }
+
+  /* Every 5 m marker the device recorded */
+  function buildSplits(run) {
+    var rows = [];
+    run.checkpoints.forEach(function (c) {
+      var d = Math.round(c[0]);
+      if (Math.abs(c[0] - d) < 1e-6 && d > 0 && d % 5 === 0) rows.push({ d: d, t: c[1], v: c[2] });
+    });
+    return rows;
+  }
+
+  function niceStep(top) { return top <= 3 ? 0.5 : (top <= 6 ? 1 : 2); }
+
+  /* One chart per 50 m of distance, all on the same speed scale */
+  function chartSegments(run) {
+    var cps = run.checkpoints;
+    if (!cps.length) return { segs: [], yMax: 0, yStep: 1 };
+    var maxD = run.totalDistanceM, top = Math.max(run.topSpeed, 1);
+    cps.forEach(function (c) { if (c[0] > maxD) maxD = c[0]; if (c[2] > top) top = c[2]; });
+    var step = niceStep(top);
+    var yMax = Math.ceil((top * 1.05) / step) * step;
+    var n = Math.max(1, Math.ceil(maxD / 50 - 1e-9));
+    var segs = [];
+    for (var k = 0; k < n; k++) {
+      var from = k * 50;
+      var to = (k === n - 1) ? from + Math.min(50, Math.max(10, Math.ceil((maxD - from) / 5) * 5)) : from + 50;
+      var pts = cps.filter(function (c) { return c[0] >= from - 1e-9 && c[0] <= to + 1e-9; });
+      segs.push({ from: from, to: to, points: pts });
+    }
+    return { segs: segs, yMax: yMax, yStep: step };
+  }
+
+  function createStore(storage, key, cap) {
+    var runs = [];
+    function persist() { try { storage.setItem(key, JSON.stringify(runs)); return true; } catch (e) { return false; } }
+    function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    return {
+      load: function () {
+        try { var s = storage.getItem(key); runs = s ? JSON.parse(s) : []; } catch (e) { runs = []; }
+        if (!Array.isArray(runs)) runs = [];
+        runs = runs.filter(function (r) { return r && r.id && r.run && Array.isArray(r.run.checkpoints); });
+        return runs;
+      },
+      all: function () { return runs; },
+      get: function (id) { for (var i = 0; i < runs.length; i++) if (runs[i].id === id) return runs[i]; return null; },
+      add: function (run, sig, receivedAt) {
+        for (var i = 0; i < runs.length; i++) if (runs[i].sig === sig) return { entry: runs[i], duplicate: true, saved: true };
+        var entry = { id: newId(), receivedAt: receivedAt, name: "", sig: sig, run: run };
+        runs.unshift(entry);
+        if (runs.length > cap) runs.length = cap;
+        return { entry: entry, duplicate: false, saved: persist() };
+      },
+      rename: function (id, name) { var r = this.get(id); if (r) { r.name = name; persist(); } },
+      remove: function (id) { runs = runs.filter(function (r) { return r.id !== id; }); persist(); },
+      clear: function () { runs = []; persist(); }
+    };
+  }
+
+  function csvCell(v) {
+    var s = String(v == null ? "" : v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;          // keep spreadsheets from treating a name as a formula
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function buildCsv(entries) {
+    var maxMark = 0;
+    entries.forEach(function (e) { buildSplits(e.run).forEach(function (s) { if (s.d > maxMark) maxMark = s.d; }); });
+    var head = ["saved_at", "name", "run_id", "mode", "mode_name", "time_s", "distance_m", "avg_speed_mps", "top_speed_mps", "avg_power_w", "peak_power_w"];
+    for (var d = 5; d <= maxMark; d += 5) head.push("time_at_" + d + "m_s");
+    var lines = [head.join(",")];
+    entries.forEach(function (e) {
+      var r = e.run, bySplit = {};
+      buildSplits(r).forEach(function (s) { bySplit[s.d] = s.t; });
+      var row = [e.receivedAt, e.name, r.runId, r.mode || "", MODES[r.mode] || "", r.totalTimeS.toFixed(2), r.totalDistanceM.toFixed(2),
+                 r.avgSpeed.toFixed(2), r.topSpeed.toFixed(2), r.avgPowerW.toFixed(0), r.peakPowerW.toFixed(0)];
+      for (var m = 5; m <= maxMark; m += 5) row.push(bySplit[m] != null ? bySplit[m].toFixed(2) : "");
+      lines.push(row.map(csvCell).join(","));
+    });
+    return lines.join("\r\n") + "\r\n";
+  }
+
+  root.SwimCore = {
+    END: END, MODES: MODES, createReceiver: createReceiver, parseRun: parseRun, validateRun: validateRun,
+    fmtClock: fmtClock, buildSplits: buildSplits, chartSegments: chartSegments, createStore: createStore, buildCsv: buildCsv
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
+<script id="ui">
+(function () {
+  "use strict";
+  var C = window.SwimCore;
+  var BLE = {
+    service: "12345678-1234-1234-1234-1234567890ab",
+    data: "12345678-1234-1234-1234-1234567890ac",
+    request: "12345678-1234-1234-1234-1234567890ad"
+  };
+  var KEY = "swimtow.runs.v1";
+
+  /* ---------- storage (falls back to memory if the browser blocks it) ---------- */
+  var storageOk = true, storage;
+  try { storage = window.localStorage; storage.setItem("__t", "1"); storage.removeItem("__t"); }
+  catch (e) {
+    storageOk = false;
+    var mem = {};
+    storage = { getItem: function (k) { return k in mem ? mem[k] : null; }, setItem: function (k, v) { mem[k] = String(v); } };
+  }
+  var store = C.createStore(storage, KEY, 500);
+  store.load();
+
+  /* ---------- tiny DOM helpers ---------- */
+  function el(tag, props) {
+    var n = document.createElement(tag);
+    if (props) for (var k in props) {
+      var v = props[k];
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else if (k.slice(0, 2) === "on") n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? "" : v);
+    }
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c == null || c === false) continue;
+      n.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    }
+    return n;
+  }
+  var NS = "http://www.w3.org/2000/svg";
+  function sv(tag, attrs, text) {
+    var n = document.createElementNS(NS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function $(id) { return document.getElementById(id); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3800);
+  }
+
+  /* ---------- formatting ---------- */
+  function when(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+  function runName(e) { return e.name || (e.run.runId != null ? "Run " + e.run.runId : "Run"); }
+  function modeChip(mode) {
+    if (!mode) return null;
+    return el("span", { "class": "chip m" + mode }, el("i"), "Mode " + mode + " " + C.MODES[mode]);
+  }
+
+  /* ---------- connection ---------- */
+  var supported = !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
+  var device = null, dataChar = null, reqChar = null;
+  var state = "idle", userDisconnect = false, reconnectToken = 0;
+  var receiver = C.createReceiver(), decoder = new TextDecoder("utf-8");
+  var receiveTimer = null, noRunTimer = null, wakeLock = null;
+
+  function connected() { return state === "connected" || state === "receiving"; }
+
+  function setState(next, info) {
+    state = next;
+    var text = "", dot = "";
+    var name = device && device.name ? device.name : "your device";
+    if (next === "idle") text = info || "Not connected. Turn the device on, then press Connect.";
+    else if (next === "connecting") { text = "Looking for your device…"; dot = "busy"; }
+    else if (next === "connected") { text = "Connected to " + name + ". Swim a run and it will appear here when it ends."; dot = "on"; }
+    else if (next === "receiving") { text = "Receiving a run…"; dot = "recv"; }
+    else if (next === "reconnecting") { text = "Connection lost. Reconnecting (" + info + " of 5)…"; dot = "busy"; }
+    else if (next === "failed") text = "Couldn't reconnect. Check the device is on and in range, then press Connect.";
+    $("statusText").textContent = text;
+    $("dot").className = "dot " + dot;
+    var cb = $("connectBtn");
+    cb.disabled = !supported || next === "connecting";
+    cb.textContent = next === "connecting" ? "Connecting…" : (next === "reconnecting" ? "Cancel" : (connected() ? "Disconnect" : "Connect"));
+    cb.className = "btn " + (connected() || next === "reconnecting" ? "" : "primary");
+    $("lastBtn").hidden = !connected();
+  }
+
+  async function keepAwake() {
+    try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", function () { wakeLock = null; }); } }
+    catch (e) { wakeLock = null; }
+  }
+  function letSleep() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && connected()) keepAwake(); });
+
+  async function openGatt() {
+    var server = await device.gatt.connect();
+    var svc = await server.getPrimaryService(BLE.service);
+    dataChar = await svc.getCharacteristic(BLE.data);
+    reqChar = await svc.getCharacteristic(BLE.request);
+    dataChar.addEventListener("characteristicvaluechanged", onChunk);
+    await dataChar.startNotifications();
+    receiver.reset();
+    setState("connected");
+    keepAwake();
+  }
+
+  async function connectFlow() {
+    if (!supported) return;
+    setState("connecting");
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [BLE.service] }, { namePrefix: "SwimTow" }],
+        optionalServices: [BLE.service]
+      });
+    } catch (e) {
+      setState("idle", e && e.name === "NotFoundError" ? "No device chosen. Turn the device on and press Connect to try again." : "Couldn't start Bluetooth: " + (e && e.message ? e.message : e));
+      return;
+    }
+    device.addEventListener("gattserverdisconnected", onDisconnected);
+    try { await openGatt(); }
+    catch (e) { setState("idle", "Couldn't connect: " + (e && e.message ? e.message : e)); }
+  }
+
+  async function autoReconnect() {
+    var token = ++reconnectToken;
+    for (var n = 1; n <= 5; n++) {
+      if (token !== reconnectToken) return;
+      setState("reconnecting", n);
+      await sleep(n === 1 ? 800 : 2000);
+      if (token !== reconnectToken) return;
+      try { await openGatt(); return; } catch (e) { /* try again */ }
+    }
+    if (token === reconnectToken) setState("failed");
+  }
+
+  function onDisconnected() {
+    letSleep();
+    receiver.reset(); clearTimeout(receiveTimer); clearTimeout(noRunTimer);
+    if (userDisconnect) { userDisconnect = false; setState("idle"); return; }
+    autoReconnect();
+  }
+
+  function onConnectClick() {
+    if (state === "reconnecting") { reconnectToken++; setState("idle", "Reconnecting cancelled."); return; }
+    if (connected()) {
+      userDisconnect = true;
+      if (device && device.gatt && device.gatt.connected) device.gatt.disconnect(); else { userDisconnect = false; setState("idle"); }
+      return;
+    }
+    if (state === "failed" && device) { reconnectToken++; setState("connecting"); openGatt().catch(function () { setState("failed"); }); return; }
+    connectFlow();
+  }
+
+  async function askForLastRun() {
+    if (!reqChar) return;
+    try {
+      var payload = new Uint8Array([1]);
+      if (reqChar.writeValueWithResponse) await reqChar.writeValueWithResponse(payload); else await reqChar.writeValue(payload);
+      clearTimeout(noRunTimer);
+      noRunTimer = setTimeout(function () { if (connected() && state !== "receiving") toast("The device has no run to send yet. Finish a run first."); }, 4000);
+    } catch (e) { toast("Couldn't ask the device: " + (e && e.message ? e.message : e)); }
+  }
+
+  function onChunk(ev) {
+    var v = ev.target.value;
+    var bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+    var text = decoder.decode(bytes, { stream: true });
+    clearTimeout(noRunTimer);
+    var json = receiver.push(text);
+    if (json === null) {
+      if (state !== "receiving") setState("receiving");
+      clearTimeout(receiveTimer);
+      receiveTimer = setTimeout(function () {
+        if (receiver.pending()) { receiver.reset(); toast("A run didn't finish arriving. Press Get last run to try again."); }
+        if (connected()) setState("connected");
+      }, 8000);
+      return;
+    }
+    clearTimeout(receiveTimer);
+    if (connected()) setState("connected");
+    handleRun(json);
+  }
+
+  function handleRun(json) {
+    var text = json.trim();
+    var parsed = C.parseRun(text);
+    if (parsed.error) { toast(parsed.error + " Press Get last run to try again."); return; }
+    var res = store.add(parsed.run, text, new Date().toISOString());
+    selectedId = res.entry.id;
+    renderAll();
+    toast(res.duplicate ? "That run was already saved." : (res.saved ? "Run saved." : "Run received, but this browser couldn't save it."));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /* ---------- views ---------- */
+  var selectedId = null, lastWidth = 0;
+
+  function fitClock() {
+    var t = document.querySelector(".clock-time");
+    if (!t) return;
+    t.style.fontSize = "";
+    var size = parseFloat(getComputedStyle(t).fontSize);
+    while (t.scrollWidth > t.clientWidth + 0.5 && size > 36) { size -= 2; t.style.fontSize = size + "px"; }
+  }
+
+  function chartFor(seg, yMax, yStep, many, W) {
+    var H = Math.min(280, Math.max(176, Math.round(W * 0.46))), pl = 40, pr = 22, pt = 16, pb = 34;
+    var span = seg.to - seg.from;
+    function X(d) { return pl + ((d - seg.from) / span) * (W - pl - pr); }
+    function Y(v) { return pt + (1 - v / yMax) * (H - pt - pb); }
+    var svg = sv("svg", { "class": "chart", viewBox: "0 0 " + W + " " + H, role: "img",
+      "aria-label": "Speed from " + seg.from + " to " + seg.to + " metres, up to " + yMax + " metres per second" });
+    for (var v = 0; v <= yMax + 1e-9; v += yStep) {
+      svg.appendChild(sv("line", { "class": v === 0 ? "axis" : "grid", x1: pl, x2: W - pr, y1: Y(v), y2: Y(v) }));
+      svg.appendChild(sv("text", { "class": "lbl", x: pl - 8, y: Y(v) + 4.5, "text-anchor": "end" }, yStep < 1 ? v.toFixed(1) : String(v)));
+    }
+    var labelEvery = span <= 25 ? 5 : 10;
+    for (var d = seg.from; d <= seg.to + 1e-9; d += 5) {
+      svg.appendChild(sv("line", { "class": "axis", x1: X(d), x2: X(d), y1: Y(0), y2: Y(0) + 5 }));
+      if ((d - seg.from) % labelEvery === 0) svg.appendChild(sv("text", { "class": "lbl", x: X(d), y: H - 9, "text-anchor": "middle" }, d + " m"));
+    }
+    svg.appendChild(sv("text", { "class": "lbl", x: pl, y: 11 }, "m/s"));
+    if (seg.points.length) {
+      var path = seg.points.map(function (p, i) { return (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[2]).toFixed(1); }).join(" ");
+      svg.appendChild(sv("path", { "class": "line", d: path }));
+      seg.points.forEach(function (p) {
+        if (p[0] > 0 && Math.abs(p[0] % 5) < 1e-6) svg.appendChild(sv("circle", { "class": "flag", cx: X(p[0]), cy: Y(p[2]), r: 4 }));
+      });
+    }
+    var block = el("div", { "class": "chart-block" });
+    if (many) block.appendChild(el("h3", { text: seg.from + " to " + seg.to + " m" }));
+    block.appendChild(svg);
+    return block;
+  }
+
+  function renderDetail() {
+    var host = $("detail");
+    host.textContent = "";
+    var e = selectedId ? store.get(selectedId) : null;
+    if (!e) {
+      var steps = el("div", { "class": "empty" },
+        el("h2", { text: "No runs yet" }),
+        supported ? el("p", { text: "Turn the device on and press Connect, then pick it from the list." }) : null,
+        el("p", { text: "Swim a run. When it ends, its time, speeds and splits show up here and are saved on this phone." }));
+      host.appendChild(steps);
+      return;
+    }
+    var r = e.run;
+    host.appendChild(el("section", { "class": "clock", "aria-label": "Run summary" },
+      el("div", { "class": "clock-meta" }, modeChip(r.mode), el("span", { text: runName(e) }), el("span", { text: when(e.receivedAt) })),
+      el("div", { "class": "clock-time", "aria-label": "Run time" }, C.fmtClock(r.totalTimeS)),
+      el("dl", { "class": "clock-stats" },
+        el("div", null, el("dt", { text: "Distance" }), el("dd", null, r.totalDistanceM.toFixed(1), el("small", { text: "m" }))),
+        el("div", null, el("dt", { text: "Top speed" }), el("dd", null, r.topSpeed.toFixed(2), el("small", { text: "m/s" }))),
+        el("div", null, el("dt", { text: "Avg speed" }), el("dd", null, r.avgSpeed.toFixed(2), el("small", { text: "m/s" }))))));
+
+    var facts = el("dl", { "class": "facts" });
+    var hasPower = r.avgPowerW > 0 || r.peakPowerW > 0;
+    facts.appendChild(el("div", null, el("dt", { text: "Power, average / peak" }), el("dd", { text: hasPower ? Math.round(r.avgPowerW) + " / " + Math.round(r.peakPowerW) + " W" : "—" })));
+    if (r.resistanceLb != null) facts.appendChild(el("div", null, el("dt", { text: "Resistance" }), el("dd", { text: r.resistanceLb + " lb" })));
+    if (r.outM != null && r.inM != null) facts.appendChild(el("div", null, el("dt", { text: "Line out / in" }), el("dd", { text: r.outM.toFixed(1) + " / " + r.inM.toFixed(1) + " m" })));
+    if (r.pullLimitHit) facts.appendChild(el("div", null, el("dt", { text: "Pull-back" }), el("dd", { text: "Stopped at the pull limit" })));
+    host.appendChild(facts);
+
+    host.appendChild(el("div", { "class": "actions" },
+      el("button", { "class": "btn small", type: "button", onclick: function () { renameRun(e.id); } }, "Rename"),
+      el("button", { "class": "btn small danger", type: "button", onclick: function () { deleteRun(e.id); } }, "Delete run")));
+
+    var splits = C.buildSplits(r);
+    var sp = el("section", { "class": "panel" }, el("h2", { text: "Splits" }));
+    var table = el("table", null,
+      el("thead", null, el("tr", null, el("th", { scope: "col", text: "Distance" }), el("th", { scope: "col", text: "Time" }), el("th", { scope: "col", text: "Speed" }))),
+      el("tbody", null));
+    var tb = table.lastChild;
+    splits.forEach(function (s) {
+      tb.appendChild(el("tr", null, el("td", { text: s.d + " m" }), el("td", { text: C.fmtClock(s.t) }), el("td", { text: s.v.toFixed(2) + " m/s" })));
+    });
+    tb.appendChild(el("tr", { "class": "finish" }, el("td", { text: "Finish, " + r.totalDistanceM.toFixed(1) + " m" }), el("td", { text: C.fmtClock(r.totalTimeS) }), el("td", { text: "—" })));
+    sp.appendChild(table);
+    if (!splits.length) sp.appendChild(el("p", { "class": "note", text: "This run ended before the 5 m mark, so there are no splits." }));
+    host.appendChild(sp);
+
+    var ch = C.chartSegments(r);
+    var cp = el("section", { "class": "panel" }, el("h2", { text: "Speed along the pool" }));
+    if (!ch.segs.length) cp.appendChild(el("p", { "class": "note", text: "No speed readings were recorded for this run." }));
+    var W = Math.max(280, Math.round(host.clientWidth || 640));
+    lastWidth = host.clientWidth;
+    ch.segs.forEach(function (seg) { cp.appendChild(chartFor(seg, ch.yMax, ch.yStep, ch.segs.length > 1, W)); });
+    host.appendChild(cp);
+    fitClock();
+  }
+
+  function renderRuns() {
+    var list = $("runList");
+    list.textContent = "";
+    var all = store.all();
+    if (!all.length) list.appendChild(el("li", null, el("p", { "class": "note", text: "Runs you receive are listed here, newest first." })));
+    all.forEach(function (e) {
+      var item = el("button", { "class": "run-item", type: "button", "aria-current": e.id === selectedId ? "true" : null,
+        onclick: function () { selectedId = e.id; renderAll(); window.scrollTo({ top: 0, behavior: "smooth" }); } },
+        el("div", { "class": "run-name", text: runName(e) }),
+        el("div", { "class": "run-line" }, el("span", { "class": "t", text: C.fmtClock(e.run.totalTimeS) }), el("span", { "class": "d", text: e.run.totalDistanceM.toFixed(1) + " m" })),
+        el("div", { "class": "run-foot" }, modeChip(e.run.mode), el("span", { text: when(e.receivedAt) })));
+      list.appendChild(el("li", null, item));
+    });
+    $("runsTools").hidden = !all.length;
+  }
+
+  function renderAll() { renderDetail(); renderRuns(); }
+
+  /* ---------- run actions ---------- */
+  function renameRun(id) {
+    var e = store.get(id); if (!e) return;
+    var name = window.prompt("Name this run", e.name || "");
+    if (name === null) return;
+    store.rename(id, name.trim().slice(0, 60));
+    renderAll();
+  }
+  function deleteRun(id) {
+    if (!window.confirm("Delete this run from this phone? This can't be undone.")) return;
+    store.remove(id);
+    var left = store.all();
+    selectedId = left.length ? left[0].id : null;
+    renderAll(); toast("Run deleted.");
+  }
+
+  async function saveFile(name, text, mime) {
+    try {
+      var file = new File([text], name, { type: mime });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    var url = URL.createObjectURL(new Blob([text], { type: mime }));
+    var a = el("a", { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  $("exportJson").addEventListener("click", function () { saveFile("swim-tow-runs.json", JSON.stringify(store.all(), null, 2), "application/json"); });
+  $("exportCsv").addEventListener("click", function () { saveFile("swim-tow-runs.csv", C.buildCsv(store.all()), "text/csv"); });
+  $("clearAll").addEventListener("click", function () {
+    if (!window.confirm("Delete all " + store.all().length + " saved runs from this phone? This can't be undone.")) return;
+    store.clear(); selectedId = null; renderAll(); toast("All runs deleted.");
+  });
+  $("connectBtn").addEventListener("click", onConnectClick);
+  $("lastBtn").addEventListener("click", askForLastRun);
+
+  /* ---------- browsers without Bluetooth ---------- */
+  function buildSupport() {
+    var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    var here = location.origin + location.pathname;
+    var body = $("supportBody");
+    var row = el("div", { "class": "row" });
+    if (ios) {
+      body.appendChild(el("p", { text: "Safari on iPhone and iPad can't connect to Bluetooth devices. Bluefy is a free browser that can. Install it from the App Store, then open this page in it." }));
+      row.appendChild(el("a", { "class": "btn primary", href: "bluefy://open?url=" + here, style: "display:inline-flex;align-items:center;text-decoration:none" }, "Open in Bluefy"));
+    } else {
+      body.appendChild(el("p", { text: "This browser can't connect to Bluetooth devices. On Android or a computer, open this page in Chrome or Edge." }));
+    }
+    row.appendChild(el("button", { "class": "btn", type: "button", onclick: function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(here).then(function () { toast("Link copied."); }, function () { window.prompt("Copy this link", here); });
+      else window.prompt("Copy this link", here);
+    } }, "Copy link"));
+    body.appendChild(row);
+    $("support").hidden = false;
+  }
+
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      var w = $("detail").clientWidth;
+      if (Math.abs(w - lastWidth) > 24) renderDetail(); else fitClock();
+    }, 150);
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitClock);
+
+  /* ---------- start ---------- */
+  var first = store.all()[0];
+  selectedId = first ? first.id : null;
+  if (!supported) buildSupport();
+  if (!storageOk) toast("This browser won't keep saved runs after you close the page.");
+  renderAll();
+  setState("idle", supported ? undefined : "Bluetooth isn't available in this browser.");
+})();
+</script>
+</body>
+</html>
